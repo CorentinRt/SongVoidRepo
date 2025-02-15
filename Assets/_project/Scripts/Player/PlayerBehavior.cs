@@ -12,6 +12,7 @@ public class PlayerBehavior : MonoBehaviour
     [SerializeField] private CharacterController _characterController;
 
     [Header("Move")]
+    private Vector2 _inputDir;
     private Vector3 _moveDir;
     private Vector3 _playerVelocity;
     [SerializeField] private float _playerSpeed = 2.0f;
@@ -22,23 +23,52 @@ public class PlayerBehavior : MonoBehaviour
     private bool _groundedPlayer;
     private bool _requestJump;
 
+    [Header("Look")]
+    [SerializeField] private Camera _playerCamera;
+    [SerializeField] private float _lookHorizontalSpeed;
+    [SerializeField] private float _lookVerticalSpeed;
+    private Vector2 _lookDelta;
+
     #endregion
 
-
+    private void Awake()
+    {
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
     private void Start()
     {
         _playerController.OnNotifyUpdateMove += ReceiveMove;
 
         _playerController.OnNotifyJump += ReceiveJump;
+
+        _playerController.OnNotifyUpdateLook += ReceiveLook;
     }
     private void OnDestroy()
     {
         _playerController.OnNotifyUpdateMove -= ReceiveMove;
 
         _playerController.OnNotifyJump -= ReceiveJump;
+
+        _playerController.OnNotifyUpdateLook -= ReceiveLook;
     }
 
-    private void FixedUpdate()
+    private void Update()
+    {
+        HandleVelocity(Time.deltaTime);
+        HandleLook(Time.deltaTime);
+    }
+
+    #region Move
+    private void ReceiveMove(Vector2 dir)
+    {
+        dir.Normalize();
+
+        _inputDir = new Vector2(dir.x, dir.y);
+        _moveDir = (_characterController.transform.right * dir.x) + (_characterController.transform.forward * dir.y);
+
+    }
+    private void HandleVelocity(float deltaTime)
     {
         _groundedPlayer = _characterController.isGrounded;
         if (_groundedPlayer && _playerVelocity.y < 0)
@@ -46,7 +76,9 @@ public class PlayerBehavior : MonoBehaviour
             _playerVelocity.y = 0f;
         }
 
-        _characterController.Move(_moveDir * Time.fixedDeltaTime * _playerSpeed);
+        _moveDir = (_characterController.transform.right * _inputDir.x) + (_characterController.transform.forward * _inputDir.y);
+
+        _characterController.Move(_moveDir * deltaTime * _playerSpeed);
 
         if (_moveDir != Vector3.zero)
         {
@@ -56,25 +88,43 @@ public class PlayerBehavior : MonoBehaviour
         // Makes the player jump
         if (_requestJump && _groundedPlayer)
         {
+            Debug.Log("Jump");
             _requestJump = false;
             _playerVelocity.y += Mathf.Sqrt(_jumpHeight * -2.0f * _gravityValue);
         }
 
-        _playerVelocity.y += _gravityValue * Time.deltaTime;
-        _characterController.Move(_playerVelocity * Time.deltaTime);
+        _playerVelocity.y += _gravityValue * deltaTime;
+        _characterController.Move(_playerVelocity * deltaTime);
     }
-
-    private void ReceiveMove(Vector2 dir)
-    {
-        dir.Normalize();
-        _moveDir = new Vector3(dir.x, 0f, dir.y);
-    }
-
+    #region Jump
     private void ReceiveJump()
     {
+        Debug.Log("Input jump");
         if (_groundedPlayer)
         {
             _requestJump = true;
         }
     }
+    #endregion
+    #endregion
+
+    #region Look
+    private void ReceiveLook(Vector2 lookDelta)
+    {
+        _lookDelta = lookDelta;
+    }
+    private void HandleLook(float deltaTime)
+    {
+        Vector3 lookRot = new Vector3(0f , _lookDelta.x, 0f);
+
+        Vector3 cameraLookRot = new Vector3(_lookDelta.y, 0f, 0f);
+
+        lookRot *= deltaTime * _lookHorizontalSpeed;
+        cameraLookRot *= deltaTime * _lookVerticalSpeed;
+
+        _characterController.transform.Rotate(lookRot);
+        _playerCamera.transform.Rotate(-cameraLookRot);
+    }
+
+    #endregion
 }
