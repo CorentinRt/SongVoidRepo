@@ -23,6 +23,11 @@ public class PlayerBehavior : MonoBehaviour
     private bool _groundedPlayer;
     private bool _requestJump;
 
+    [SerializeField] private float _jumpBufferTimer;
+    private Coroutine _jumpBufferCoroutine;
+    [SerializeField] private float _jumpCoyoteTimer;
+    private float _jumpCoyoteCurrentCounter;
+
     [Header("Look")]
     [SerializeField] private Camera _playerCamera;
     [SerializeField] private float _lookHorizontalSpeed;
@@ -71,6 +76,18 @@ public class PlayerBehavior : MonoBehaviour
     private void HandleVelocity(float deltaTime)
     {
         _groundedPlayer = _characterController.isGrounded;
+
+        // Coyote time
+        if (_groundedPlayer)  // Coyote time counter
+        {
+            _jumpCoyoteCurrentCounter = _jumpCoyoteTimer;
+        }
+        else
+        {
+            _jumpCoyoteCurrentCounter -= Time.deltaTime;
+        }
+        // End coyote time
+
         if (_groundedPlayer && _playerVelocity.y < 0)
         {
             _playerVelocity.y = 0f;
@@ -86,11 +103,9 @@ public class PlayerBehavior : MonoBehaviour
         }
 
         // Makes the player jump
-        if (_requestJump && _groundedPlayer)
+        if (_requestJump && (_groundedPlayer || _jumpCoyoteCurrentCounter > 0f))
         {
-            Debug.Log("Jump");
-            _requestJump = false;
-            _playerVelocity.y += Mathf.Sqrt(_jumpHeight * -2.0f * _gravityValue);
+            Jump();
         }
 
         _playerVelocity.y += _gravityValue * deltaTime;
@@ -99,11 +114,57 @@ public class PlayerBehavior : MonoBehaviour
     #region Jump
     private void ReceiveJump()
     {
-        Debug.Log("Input jump");
-        if (_groundedPlayer)
+        if (_requestJump) return;
+        if (_jumpBufferCoroutine != null)
         {
-            _requestJump = true;
+            StopCoroutine(_jumpBufferCoroutine);
+            _jumpBufferCoroutine = null;
         }
+
+        _jumpBufferCoroutine = StartCoroutine(JumpBufferCoroutine());
+    }
+    private void Jump()
+    {
+        Debug.Log("Jump");
+        _requestJump = false;
+        _playerVelocity.y += Mathf.Sqrt(_jumpHeight * -2.0f * _gravityValue);
+        _jumpCoyoteCurrentCounter = 0f;
+    }
+    private void ResetJumpBuffer()
+    {
+        if (_jumpBufferCoroutine != null)
+        {
+            StopCoroutine(_jumpBufferCoroutine);
+            _jumpBufferCoroutine = null;
+        }
+    }
+    private IEnumerator JumpBufferCoroutine()
+    {
+        float currentTime = 0f;
+
+        while (currentTime < _jumpBufferTimer)
+        {
+            currentTime += Time.deltaTime;
+
+            if (_characterController.isGrounded)
+            {
+                _requestJump = true;
+
+                yield break;
+            }
+            else if (_jumpCoyoteCurrentCounter > 0f)   // Coyote Time Detection
+            {
+                _requestJump = true;
+
+                yield break;
+            }
+
+            yield return null;
+        }
+
+        ResetJumpBuffer();
+
+        yield return null;
     }
     #endregion
     #endregion

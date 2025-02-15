@@ -355,6 +355,8 @@ MonoBehaviour:
   _characterController: {fileID: 4945074467628493535}
   _playerSpeed: 2
   _jumpHeight: 1
+  _jumpBufferTimer: 0.5
+  _jumpCoyoteTimer: 0.3
   _playerCamera: {fileID: 3160533905084397192}
   _lookHorizontalSpeed: 10
   _lookVerticalSpeed: 6
